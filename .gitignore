@@ -1,0 +1,8 @@
+.vscode
+
+Testing
+Testing/*
+venv
+venv/*
+
+*.pyc
