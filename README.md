@@ -59,7 +59,7 @@ You can start the server just by running `python Server.py` from the [src](src/)
 [*] Starting HTTP Server...
 [*] Starting MITM Proxy...
 ```
-Requests to the HTTP server can be made by sending a request in the following form:
+Requests to the HTTP server can be made by sending a GET request with the following form:
 ```shell
 GET http://localhost:8000?id_token=[id_token]
 ```
