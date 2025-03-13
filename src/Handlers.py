@@ -8,7 +8,7 @@ from ADB import ADBCommand
 from Hijacker import Hijacker
 from DataPacks import FTask
 from ADB import ADBCommand
-from Strings import Utils, SharedPreferences, NSOApp
+from Strings import Utils, SharedPreferences, TokenData, NSOApp
 
 class FRequestHandler(BaseHTTPRequestHandler):
     def __init__(self, *args, hijacker: Hijacker, **kwargs):
@@ -18,6 +18,7 @@ class FRequestHandler(BaseHTTPRequestHandler):
         startCmd.AddCommand("setenforce 0")
         startCmd.AddCommand("am force-stop com.nintendo.znca")
         startCmd.AddCommand(f'echo "{Utils.ToHexString(SharedPreferences.V1Layout())}" > {SharedPreferences.Path()}')
+        startCmd.AddCommand(f'echo "{Utils.ToHexString(TokenData.V1Layout())}" > {TokenData.Path()}')
         startCmd.AddCommand(f"am start -n com.nintendo.znca/{NSOApp.MainActivity()}")
         startCmd.UseSU()
         

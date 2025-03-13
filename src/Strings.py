@@ -18,6 +18,22 @@ class Utils:
 
         return deBytes.decode("ascii")
 
+class TokenData:
+    def V1Layout() -> str:
+        lines = [
+            "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>",
+            '<map>',
+            '<string name="SessionToken">eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI3MWI5NjNjMWI3YjZkMTE5IiwianRpIjoxNzA1NTMyMTE3MSwic3ViIjoiMDAwMDAwMDAwMDAwMDAwMCIsImlzcyI6Imh0dHBzOi8vYWNjb3VudHMubmludGVuZG8uY29tIiwiaWF0IjoxNzQxMzc0OTM2LCJzdDpzY3AiOlswLDgsOSwxNywyM10sImV4cCI6MTgwNDQ0NjkzNiwidHlwIjoic2Vzc2lvbl90b2tlbiJ9.ez_rKHSZTrR2Pl76RbzxWmCyGJiM0vgESFNreXXXXXX</string>',
+            '<string name="AccessToken"></string>',
+            '<string name="IDToken"></string>',
+            '</map>'
+        ]
+
+        return "".join(lines)
+    
+    def Path() -> str:
+        return "/data/data/com.nintendo.znca/shared_prefs/TokenData.xml"
+
 class SharedPreferences:
     def V1Layout() -> str:
         lines = [

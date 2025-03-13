@@ -16,6 +16,8 @@ This project provides a server for accepting incoming F-Token requests and contr
 ## Prerequisites
 - A **rooted** Android Device/Redroid Container in developer mode.
     - The latest version of Nintendo Switch Online must be installed.
+        - Needs to have been started at least once - does not need to be logged in.
+        - Must have root access disabled (i.e. Magisk DenyList or similar).
     - Your MITMProxy Certificate must be installed to the system store.
     - ADB Shell must have superuser permissions.
 - [MITMProxy](https://mitmproxy.org/) and [ADB](https://developer.android.com/tools/adb) installed on the hosting computer.
