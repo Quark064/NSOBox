@@ -59,11 +59,28 @@ You can start the server just by running `python Server.py` from the [src](src/)
 [*] Starting HTTP Server...
 [*] Starting MITM Proxy...
 ```
-Requests to the HTTP server can be made by sending a GET request with the following form:
+
+The server supports both types of F Token generation.
+
+#### Generation Method 1
+
+The first F token required to gain a `webApiServerCredential` from `https://api-lp1.znc.srv.nintendo.net/v3/Account/Login` can be generated using the following GET request:
 ```shell
-GET http://localhost:8000?id_token=[id_token]
+# For F1 Tokens | id_token from https://accounts.nintendo.com/connect/1.0.0/api/token
+GET http://localhost:8000/F1?id_token=[id_token]
 ```
-When successful, the server will return an `application/json` containing the following information:
+
+F1 tokens can then be used to get a `webApiServerCredential` from `https://api-lp1.znc.srv.nintendo.net/v3/Account/Login`.
+
+#### Generation Method 2
+The second F token required to gain `GameWebServiceToken` from `https://api-lp1.znc.srv.nintendo.net/v2/Game/GetWebServiceToken` can be generated using the following GET request:
+```shell
+# For F2 Tokens | webApiServerCredential from https://api-lp1.znc.srv.nintendo.net/v3/Account/Login
+GET http://localhost:8000/F2?web_api_token=[webApiServerCredential]
+```
+A `GameWebServiceToken` can be used to access game specific APIs, such as Splatnet.
+#### Results
+When successful, the server will return an `application/json` payload containing the following information:
 ```json
 {
   "timestamp": 1700000000000,
@@ -71,7 +88,8 @@ When successful, the server will return an `application/json` containing the fol
   "f": "deb416eaa8c61f4d18f84f7c1f1e4d9562a1b53f7..."
 }
 ```
-This token can then be used to get a `webApiServerCredential` from `https://api-lp1.znc.srv.nintendo.net/v3/Account/Login`.
+In the event of an error, the server will return a non-200 status code and an `application/text` payload containing an error message.
 
 ## WIPs
-- Support for the F2 tokens used to log into game specific services is currently being added.
+- Upgrading Networking Infrastructure
+- Ease of Access Improvements

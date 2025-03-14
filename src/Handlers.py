@@ -1,91 +1,20 @@
-import subprocess
-import json
-
+from json import loads
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
 
 from ADB import ADBCommand
 from Hijacker import Hijacker
 from DataPacks import FTask
-from ADB import ADBCommand
-from Strings import Utils, SharedPreferences, TokenData, NSOApp
+from ADB import ADBCommand, ADBUtil
+from Strings import SharedPreferences, TokenData, NSOApp
 
-class FRequestHandler(BaseHTTPRequestHandler):
-    def __init__(self, *args, hijacker: Hijacker, **kwargs):
-        self.hijacker = hijacker
-
-        startCmd = ADBCommand()
-        startCmd.AddCommand("setenforce 0")
-        startCmd.AddCommand("am force-stop com.nintendo.znca")
-        startCmd.AddCommand(f'echo "{Utils.ToHexString(SharedPreferences.V1Layout())}" > {SharedPreferences.Path()}')
-        startCmd.AddCommand(f'echo "{Utils.ToHexString(TokenData.V1Layout())}" > {TokenData.Path()}')
-        startCmd.AddCommand(f"am start -n com.nintendo.znca/{NSOApp.MainActivity()}")
-        startCmd.UseSU()
-        
-        self.startCmd = startCmd.Build()
-
-        endCmd = ADBCommand()
-        endCmd.AddCommand("am force-stop com.nintendo.znca")
-        
-        self.endCmd = endCmd.Build()
-
-        super().__init__(*args, **kwargs)
-    
-    def do_GET(self):
-        # Get the ID Token from the URL parameters
-        try:
-            parsedURL = urlparse(self.path)
-            idToken = str(parse_qs(parsedURL.query)['id_token'][0])
-        except Exception:
-            self.SendResponse(
-                statusCode = 400,
-                body = "No 'id_token' URL parameter was given."
-            )
-            return
-
-        # Get the User ID from the ID Token
-        try:
-            tokenTask = FTask(idToken)
-        except Exception:
-            self.SendResponse(
-                statusCode = 400,
-                body = "Failed to decode the given 'id_token'."
-            )
-            return
-
-        # Generate the F Token using the Android Device
-        try:
-            # Attempt to set as the current MITM Task
-            res = self.hijacker.AttemptSet(tokenTask)
-            while not res.Successful:
-                res.CurrTask.Completed.wait()
-                res = self.hijacker.AttemptSet(tokenTask)
-
-            # Process the Task
-            subprocess.call(self.endCmd, shell=True)
-            subprocess.call(self.startCmd, shell=True)
-            tokenTask.Completed.wait()
-
-            self.SendResponse(
-                statusCode = 200,
-                headers = {
-                    "User-ID": tokenTask.ID
-                },
-                body = tokenTask.F.ToJSON()
-            )
-
-        except Exception as ex:
-            self.SendResponse(
-                statusCode = 500,
-                body = f"An internal server exception occurred generating F Token.\n\n{str(ex)}"
-            )
-    
+class HandlerCommon:
     def SendResponse(self, statusCode: int, headers: dict[str, str] | None = None, body: str | None = None) -> None:
         self.send_response(statusCode)
 
         contentType = "application/json"
         try:
-            json.loads(body)
+            loads(body)
         except Exception:
             contentType = "application/text"
         
@@ -105,3 +34,96 @@ class FRequestHandler(BaseHTTPRequestHandler):
             print("[!] Client disconnected before response was sent.")
         except Exception as e:
             print(f"[!] Unexpected error in SendResponse: {e}")
+
+
+class FRequestHandler(BaseHTTPRequestHandler, HandlerCommon):
+    def __init__(self, *args, hijacker: Hijacker, **kwargs):
+        self.hijacker = hijacker
+
+        self.prepareEnvCmd = ADBCommand()
+        self.prepareEnvCmd.AddCommand("setenforce 0")
+        self.prepareEnvCmd.AddCommand("am force-stop com.nintendo.znca")
+        self.prepareEnvCmd.UseSU()
+        
+        self.startActivityCmd = ADBCommand()
+        self.startActivityCmd.AddCommand(f"am start -n com.nintendo.znca/{NSOApp.MainActivity()}")
+
+        self.startWebViewActivity = ADBCommand()
+        self.startWebViewActivity.AddCommand(f'am start -a android.intent.action.VIEW -d "{NSOApp.AppletLaunchURL()}"')
+
+        super().__init__(*args, **kwargs)
+    
+    def do_GET(self):
+        path = self.path.split('?')[0]
+        match(path.lower()):
+            case "/f1":
+                self.GenF(FTask.HashMethod.F1)
+            case "/f2":
+                self.GenF(FTask.HashMethod.F2)
+            case _:
+                self.SendResponse(
+                    statusCode = 404,
+                    body = "Not a valid endpoint."
+                )
+
+    def GenF(self, method: FTask.HashMethod):
+        tokenName = "id_token" if method == FTask.HashMethod.F1 else "web_api_token"
+
+        # Get the Token from the URL parameters
+        try:
+            parsedURL = urlparse(self.path)
+            token = str(parse_qs(parsedURL.query)[tokenName][0])
+        except Exception:
+            self.SendResponse(
+                statusCode = 400,
+                body = f"No '{tokenName}' URL parameter was given."
+            )
+            return
+
+        # Get the Current ID from the Token
+        try:
+            tokenTask = FTask(token, method)
+        except Exception:
+            self.SendResponse(
+                statusCode = 400,
+                body = f"Failed to decode the given '{tokenName}'."
+            )
+            return
+
+        # Generate the F Token using the Android Device
+        try:
+            # Attempt to set as the current MITM Task
+            res = self.hijacker.AttemptSet(tokenTask)
+            while not res.Successful:
+                res.CurrTask.Completed.wait()
+                res = self.hijacker.AttemptSet(tokenTask)
+
+            # Prepare the environment for modification
+            self.prepareEnvCmd.Run()
+            
+            # Groom NSO's application storage
+            if method == FTask.HashMethod.F1:
+                ADBUtil.OverwriteFile(SharedPreferences.Path(), SharedPreferences.V1Layout(), useSU=True)
+                ADBUtil.OverwriteFile(TokenData.Path(), TokenData.V1Layout(), useSU=True)
+                self.startActivityCmd.Run()
+
+            else:
+                ADBUtil.OverwriteFile(SharedPreferences.Path(), SharedPreferences.V2Layout(tokenTask.Token, tokenTask.ID), useSU=True)
+                ADBUtil.OverwriteFile(TokenData.Path(), TokenData.V1Layout(), useSU=True)
+                self.startWebViewActivity.Run()
+            
+            tokenTask.Completed.wait()
+
+            self.SendResponse(
+                statusCode = 200,
+                headers = {
+                    f"User-V{str(method.value)}-ID": tokenTask.ID
+                },
+                body = tokenTask.F.ToJSON()
+            )
+
+        except Exception as ex:
+            self.SendResponse(
+                statusCode = 500,
+                body = f"An internal server exception occurred generating F{str(method.value)} Token.\n\n{str(ex)}"
+            )

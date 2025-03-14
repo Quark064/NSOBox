@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from json import loads, dumps
 from threading import Event
+from enum import Enum
 
 from Strings import Utils
 
@@ -20,12 +21,17 @@ class FPack:
         return dumps(res)
 
 class FTask:
-    def __init__(self, idToken) -> None:
-        self.Completed: Event = Event()
-        self.IDToken: str    = idToken
-        self.F: None | FPack = None
+    class HashMethod(Enum):
+        F1 = 1
+        F2 = 2
 
-        payload = self.IDToken.split('.')[1]
+    def __init__(self, token: str, method: HashMethod) -> None:
+        self.Completed: Event = Event()
+        self.Token: str     = token
+        self.Method           = method
+        self.F: None | FPack  = None
+
+        payload = self.Token.split('.')[1]
         self.ID: str = loads(Utils.DecodeB64String(payload))["sub"]
 
     
