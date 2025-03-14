@@ -38,6 +38,8 @@ class HandlerCommon:
 
 class FRequestHandler(BaseHTTPRequestHandler, HandlerCommon):
     def __init__(self, *args, hijacker: Hijacker, **kwargs):
+        self.GENERATION_TIMEOUT_SECS = 20
+
         self.hijacker = hijacker
 
         self.prepareEnvCmd = ADBCommand()
@@ -106,21 +108,28 @@ class FRequestHandler(BaseHTTPRequestHandler, HandlerCommon):
                 ADBUtil.OverwriteFile(SharedPreferences.Path(), SharedPreferences.V1Layout(), useSU=True)
                 ADBUtil.OverwriteFile(TokenData.Path(), TokenData.V1Layout(), useSU=True)
                 self.startActivityCmd.Run()
-
             else:
                 ADBUtil.OverwriteFile(SharedPreferences.Path(), SharedPreferences.V2Layout(tokenTask.Token, tokenTask.ID), useSU=True)
                 ADBUtil.OverwriteFile(TokenData.Path(), TokenData.V1Layout(), useSU=True)
                 self.startWebViewActivity.Run()
             
-            tokenTask.Completed.wait()
+            tokenTask.Completed.wait(self.GENERATION_TIMEOUT_SECS)
 
-            self.SendResponse(
-                statusCode = 200,
-                headers = {
-                    f"User-V{str(method.value)}-ID": tokenTask.ID
-                },
-                body = tokenTask.F.ToJSON()
-            )
+            # Check if the Task completed or if it failed to get a response in time
+            if tokenTask.Completed.isSet():
+                self.SendResponse(
+                    statusCode = 200,
+                    headers = {
+                        f"User-V{str(method.value)}-ID": tokenTask.ID
+                    },
+                    body = tokenTask.F.ToJSON()
+                )
+            else:
+                self.SendResponse(
+                    statusCode = 500,
+                    body = f"The generation request timed out: did not receive token from device within the time limit ({int(self.GENERATION_TIMEOUT_SECS)} seconds)."
+                )
+                self.hijacker.ClearTask()
 
         except Exception as ex:
             self.SendResponse(

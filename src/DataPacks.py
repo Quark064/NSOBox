@@ -27,14 +27,13 @@ class FTask:
 
     def __init__(self, token: str, method: HashMethod) -> None:
         self.Completed: Event = Event()
-        self.Token: str     = token
+        self.Token: str       = token
         self.Method           = method
         self.F: None | FPack  = None
 
         payload = self.Token.split('.')[1]
         self.ID: str = loads(Utils.DecodeB64String(payload))["sub"]
 
-    
     def Complete(self, data: FPack) -> None:
         self.F = data
         self.Completed.set()

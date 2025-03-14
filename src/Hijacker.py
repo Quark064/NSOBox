@@ -18,6 +18,9 @@ class Hijacker:
         with self.__lock:
             return self.currentTask
     
+    def ClearTask(self) -> None:
+        self.SetTask(None)
+
     def AttemptSet(self, task: FTask) -> FTaskSetResult:
         with self.__lock:
             if self.currentTask == None:
@@ -71,7 +74,7 @@ class Hijacker:
             )
 
             task = self.GetTask()
-            self.SetTask(None)
+            self.ClearTask()
             task.Complete(pack)
 
         flow.response = None
@@ -120,7 +123,7 @@ class Hijacker:
             )
 
             task = self.GetTask()
-            self.SetTask(None)
+            self.ClearTask()
             task.Complete(pack)
 
         flow.response = None
